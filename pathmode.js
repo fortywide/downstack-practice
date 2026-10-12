@@ -764,7 +764,7 @@ function queue_generator(expr) {
 
 function gen_url() {
   var first =
-    "https://himitsuconfidential.github.io/downstack-practice/usermode.html/";
+    "https://www.fortywi.de/downstack-practice/usermode.html/";
   var second = document.getElementById("field").value;
   var third = document.getElementById("input_queue").value;
   var output = document.getElementById("output_url");
