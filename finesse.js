@@ -5,13 +5,15 @@ var Config = {'das':100, 'arr':0, 'delay':0, 'pressing_left':false, 'pressing_ri
 var Customized_key = ['ArrowLeft','ArrowRight','ArrowDown','Space','KeyZ','KeyX','KeyA','ShiftLeft','KeyR','KeyP']
 var board = document.getElementById('board')
 
-// inputs used on the current piece, and the finesse stats of the session
+// inputs used on the current piece, the turn it belongs to, and the finesse stats of the session
 var Finesse = {
     inputs: [],
-    softdropped: false,
     left_input: null,
     right_input: null,
+    down_input: null,
+    turn: null,
     target: null,
+    target_piece: '',
     last_fault: false,
     placed: 0,
     checked: 0,
@@ -153,7 +155,7 @@ function render(){
         ctx.fillRect(col*30+offset_x,(19-row+min_relative_height)*30+offset_y,30,30);
     // render where the redone piece was placed
     if (Finesse.target != null){
-        ctx.strokeStyle = color_table[game.tetramino]
+        ctx.strokeStyle = color_table[Finesse.target_piece]
         ctx.lineWidth = 3
         for (var [col, row] of Finesse.target)
             ctx.strokeRect(col*30+offset_x+2,(19-row)*30+offset_y+2,26,26);
@@ -236,48 +238,61 @@ const finesse_moves = [
     {name: 'CW', move: g => g.rotate_clockwise()},
     {name: 'CCW', move: g => g.rotate_anticlockwise()},
     {name: '180', move: g => g.rotate_180()},
+    {name: 'Soft Drop', move: g => g.softdrop()},
 ]
-var finesse_table_cache = {}
 
-// the cells a piece covers relative to the floor, so orientations that look the same (S, Z, I) count as the same placement
-function placement_key(tetramino, orientation, x){
-    var cells = shape_table[tetramino][orientation]
-    var min_y = Math.min(...cells.map(cell => cell[1]))
-    return cells.map(([dx, dy]) => [dx+x, dy-min_y]).sort((a, b) => a[0]-b[0] || a[1]-b[1]).join(' ')
+// the cells a piece lands on if hard dropped now, and for T whether it counts as a T-spin
+function landing_key(g){
+    var previous_y = g.y
+    var previous_lastmove = g.lastmove
+    g.drop()
+    var key = g.to_shape().map(cell => cell.join()).sort().join(' ')
+    if (g.tetramino == 'T') key += ' ' + g.is_tspin()
+    g.y = previous_y
+    g.lastmove = previous_lastmove
+    return key
 }
 
-// fewest inputs from spawn to every placement on an empty board, where holding DAS counts as one input
-function get_finesse_table(tetramino){
-    var cache_key = tetramino + (Config.rotate180_ind? '180': '')
-    if (finesse_table_cache[cache_key]) return finesse_table_cache[cache_key]
+// the part of the last move that is_tspin looks at
+function spin_class(lastmove){
+    if (lastmove == 'zkick4') return 'kick4'
+    return 'axz'.includes(lastmove[0])? 'rotate': ''
+}
 
+// fewest inputs from spawn to every landing spot on the current board,
+// where holding DAS counts as one input and soft drop is instant and counts as one input
+function get_finesse_table(tetramino){
     var sim = new Game()
-    sim.board = Array.from({length: 20}, () => Array(10).fill('N'))
+    sim.board = game.board
     sim.bag = [tetramino]
     sim.update()
-    var start = [sim.x, sim.y, sim.orientation]
-    var seen = {}
-    seen[start] = true
-    var queue = [{state: start, path: []}]
+    var state_key = g => [g.x, g.y, g.orientation, tetramino == 'T'? spin_class(g.lastmove): ''].join()
+    var save_state = (g, path) => ({x: g.x, y: g.y, orientation: g.orientation, lastmove: g.lastmove, path: path})
+    var load_state = (g, state) => {
+        g.x = state.x
+        g.y = state.y
+        g.orientation = state.orientation
+        g.lastmove = state.lastmove
+    }
     var table = {}
+    if (sim.is_collide()) return table
+    var seen = {}
+    seen[state_key(sim)] = true
+    var queue = [save_state(sim, [])]
     for (var i=0; i<queue.length; i++){
-        var state = queue[i].state
-        var path = queue[i].path
-        var key = placement_key(tetramino, state[2], state[0])
-        if (!(key in table)) table[key] = path
+        var state = queue[i]
+        load_state(sim, state)
+        var key = landing_key(sim)
+        if (!(key in table)) table[key] = state.path
         for (var finesse_move of finesse_moves){
             if (finesse_move.name == '180' && !Config.rotate180_ind) continue
-            sim.x = state[0]
-            sim.y = state[1]
-            sim.orientation = state[2]
+            load_state(sim, state)
             finesse_move.move(sim)
-            var next = [sim.x, sim.y, sim.orientation]
-            if (seen[next]) continue
-            seen[next] = true
-            queue.push({state: next, path: path.concat(finesse_move.name)})
+            if (seen[state_key(sim)]) continue
+            seen[state_key(sim)] = true
+            queue.push(save_state(sim, state.path.concat(finesse_move.name)))
         }
     }
-    finesse_table_cache[cache_key] = table
     return table
 }
 
@@ -295,9 +310,11 @@ function record_das(direction){
     Finesse[held].name = 'DAS ' + direction
 }
 
-function new_piece(){
+// every input from spawn to hard drop counts, including moves on a piece that was then held,
+// and the turn remembers its starting state so redo can bring back the same piece and hold
+function start_turn(){
+    Finesse.turn = {piece: game.tetramino, bag: game.bag.slice(), holdmino: game.holdmino}
     Finesse.inputs = []
-    Finesse.softdropped = false
 }
 
 function describe_inputs(names){
@@ -305,14 +322,16 @@ function describe_inputs(names){
     return names.join(', ') + ' (' + names.length + (names.length == 1? ' input)': ' inputs)')
 }
 
-// returns whether the current piece would be placed with more inputs than needed; soft dropped pieces are not checked
+// returns whether the current piece would be placed with more inputs or holds than needed
 function check_finesse(){
-    if (Finesse.softdropped) return false
-    var optimal = get_finesse_table(game.tetramino)[placement_key(game.tetramino, game.orientation, game.x)]
+    var optimal = get_finesse_table(game.tetramino)[landing_key(game)]
     if (optimal === undefined) return false
     Finesse.checked += 1
     var used = Finesse.inputs.map(input => input.name)
-    Finesse.last_fault = used.length > optimal.length
+    var needed_holds = game.tetramino == Finesse.turn.piece? 0: 1
+    if (needed_holds) optimal = ['Hold'].concat(optimal)
+    var holds = used.filter(name => name == 'Hold').length
+    Finesse.last_fault = used.length > optimal.length || holds > needed_holds
     if (Finesse.last_fault){
         Finesse.faults += 1
         document.getElementById('finesse_piece').textContent = game.tetramino + ' piece'
@@ -342,8 +361,11 @@ function hard_drop(){
     var fault = check_finesse()
     if (fault && Config.redo_ind){
         Finesse.target = landing_cells()
+        Finesse.target_piece = game.tetramino
+        game.bag = Finesse.turn.bag.slice()
+        game.holdmino = Finesse.turn.holdmino
         game.update()
-        new_piece()
+        start_turn()
         update_stats()
         return
     }
@@ -359,22 +381,21 @@ function hard_drop(){
     Finesse.lines += current.line_clear
     if (game === current && fault && Config.grey_ind) grey_out(cells, full_rows)
     Finesse.target = null
-    new_piece()
+    start_turn()
     play_sound()
     update_stats()
 }
 
 function hold(){
+    record_input('Hold')
     game.hold()
-    Finesse.target = null
-    new_piece()
 }
 
 // called by Game on top out: start a new board but keep the stats
 function retry(){
     game = new Game()
     Finesse.target = null
-    new_piece()
+    start_turn()
     render()
 }
 
@@ -452,21 +473,21 @@ function release_right(){
     Config.pressing_right = false;
 }
 
-function soft_drop(){
-    var previous_y = game.y
-    game.softdrop()
-    if (game.y != previous_y) Finesse.softdropped = true
-    render();
-}
-
 function press_down(first_call = false){
     if (first_call && !Config.pressing_down){
-        soft_drop()
+        Finesse.down_input = record_input('Soft Drop')
+        game.softdrop()
+        render();
         Config.pressing_down = true;
         setTimeout(press_down, 1)
     }
     else if (!first_call && Config.pressing_down){
-        soft_drop()
+        var previous_y = game.y
+        game.softdrop()
+        // a soft drop still held from the previous piece is a new input for this one
+        if (game.y != previous_y && !Finesse.inputs.includes(Finesse.down_input))
+            Finesse.down_input = record_input('Soft Drop')
+        render();
         setTimeout(press_down, 1)
     }
 }
@@ -622,6 +643,7 @@ set_event_listener()
 load_setting()
 load_gamemode()
 update_keybind()
+start_turn()
 update_stats()
 board.focus()
 render()
