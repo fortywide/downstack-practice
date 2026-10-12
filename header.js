@@ -59,11 +59,17 @@ const jltsz_anticlockwise_kick_table = [[[1,0], [1,1], [0,-2], [1,-2]], //0->L 0
                               [[-1,0], [-1,-1], [0,2], [-1,2]], //L->A 32
                               [[-1,0], [-1,1], [0,-2], [-1,-2]], //A->R 21
                               [[1,0], [1,-1], [0,2], [1,2]]] //R->0 10
-const jltsz_180_kick_table = [[[0,1]],
-                        [[-1,0]],
-                        [[0,-1]],
-                        [[1,0]],
+// TETR.IO SRS+ 180 kicks, indexed by the orientation before rotating
+const jltsz_180_kick_table = [[[0,1], [1,1], [-1,1], [1,0], [-1,0]], //0->A 02
+                        [[-1,0], [-1,2], [-1,1], [0,2], [0,1]], //L->R 31
+                        [[0,-1], [-1,-1], [1,-1], [-1,0], [1,0]], //A->0 20
+                        [[1,0], [1,2], [1,1], [0,2], [0,1]], //R->L 13
                         ]
+const i_180_kick_table = [[[0,1]], //0->A 02
+                    [[-1,0]], //L->R 31
+                    [[0,-1]], //A->0 20
+                    [[1,0]], //R->L 13
+                    ]
 const i_clockwise_kick_table = [[[-2,0], [1,0], [-2,-1], [1,2]], //0->R 01
                           [[1,0], [-2,0], [1,-2], [-2,1]], //L->0 30
                           [[2,0], [-1,0], [2,1], [-1,-2]], //A->L 23
@@ -425,22 +431,21 @@ class Game{
             return true
         }
 
-        if ('JLTSZ'.includes(this.tetramino)){
-            for (var idx=0; idx< jltsz_180_kick_table[this.orientation].length; idx++){
-                var coor = jltsz_180_kick_table[this.orientation][idx]
+        if ('JLTSZI'.includes(this.tetramino)){
+            var kick_table = 'JLTSZ'.includes(this.tetramino)? jltsz_180_kick_table : i_180_kick_table
+            for (var idx=0; idx< kick_table[previous_orientation].length; idx++){
+                var coor = kick_table[previous_orientation][idx]
                 var x = coor[0]
                 var y = coor[1]
-                this.x -= x
-                this.y -= y
+                this.x += x
+                this.y += y
                 if (! this.is_collide()){
-                    this.lastmove = 'zkick' + (idx+1)
+                    this.lastmove = 'akick' + (idx+1)
                     return true
                 }
                 this.x = previous_x
                 this.y = previous_y
             }
-        
-            
         }
         this.orientation = previous_orientation
         return false
@@ -568,7 +573,7 @@ class Game{
             return true
         }
         else if (test1 && test2 == 1 && test3 >= 3){
-            if (this.lastmove.slice(1) == 'kick4' && [1,3].includes(this.orientation))
+            if (this.lastmove == 'zkick4' && [1,3].includes(this.orientation))
                 return true
             else if ('axz'.includes(this.lastmove[0]))
                 return 'tspinmini'}
