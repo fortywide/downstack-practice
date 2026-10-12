@@ -29,14 +29,14 @@ var Config = {
 };
 
 var Customized_key = [
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowDown",
+  "KeyJ",
+  "KeyL",
+  "KeyK",
   "Space",
-  "KeyZ",
-  "KeyX",
+  "KeyS",
+  "KeyD",
   "KeyA",
-  "ShiftLeft",
+  "KeyF",
   "KeyR",
   "KeyP",
 ];

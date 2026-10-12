@@ -2,7 +2,7 @@ var game = new Game();
 const Keybind = {'keydown':{}, 'keyup':{}}
 var Config = {'das':100, 'arr':0, 'delay':0, 'pressing_left':false, 'pressing_right': false, 'pressing_down': false, 'pressing':{},
 'redo_ind':true, 'grey_ind':false, 'rotate180_ind':true}
-var Customized_key = ['ArrowLeft','ArrowRight','ArrowDown','Space','KeyZ','KeyX','KeyA','ShiftLeft','KeyR','KeyP']
+var Customized_key = ['KeyJ','KeyL','KeyK','Space','KeyS','KeyD','KeyA','KeyF','KeyR','KeyP']
 var board = document.getElementById('board')
 
 // inputs used on the current piece, the turn it belongs to, and the finesse stats of the session
