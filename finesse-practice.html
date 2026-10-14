@@ -97,12 +97,12 @@
             <div id="gamemode" class="open">
                 <table>
                     <tbody>
-                        <tr><td><input id="redo_ind" type="checkbox" checked="checked"></td><td>Redo the piece on a finesse error</td></tr>
+                        <tr><td><input id="redo_ind" type="checkbox" checked="checked"></td><td>Redo the piece in the same spot on a finesse error</td></tr>
                         <tr><td><input id="grey_ind" type="checkbox"></td><td>Grey out pieces placed with a finesse error (when not redoing)</td></tr>
                         <tr><td><input id="rotate180_ind" type="checkbox" checked="checked"></td><td>Use 180 rotation in the optimal finesse</td></tr>
                     </tbody>
                 </table>
-                <p>Each piece is checked against the fewest inputs that reach the same spot from spawn on the current board. Holding DAS and soft drop (instant) each count as one input, and hard drop is free. Every input from spawn to hard drop counts, including holds and moves on a piece you then hold, and only one hold is allowed to get the piece you place.</p>
+                <p>Each piece is checked against the fewest inputs that reach the same spot from spawn on the current board. Holding DAS and soft drop (instant) each count as one input, and hard drop is free. Every input from spawn to hard drop counts, including holds and moves on a piece you then hold, and only one hold is allowed to get the piece you place. A redone piece has to go back in the outlined spot, and dropping it anywhere else sends it back to the top.</p>
             </div>
 
         </div>

@@ -14,6 +14,8 @@ var Finesse = {
     turn: null,
     target: null,
     target_piece: '',
+    target_key: '',
+    wrong_spot: '',
     last_fault: false,
     placed: 0,
     checked: 0,
@@ -110,6 +112,10 @@ function save_gamemode(){
     }
     catch(err){
         console.log('storage unavailable')
+    }
+    if (!Config.redo_ind){
+        Finesse.target = null
+        Finesse.wrong_spot = ''
     }
 }
 
@@ -221,6 +227,11 @@ function render(){
         ctx.fillText('Finesse',10,400)
         ctx.fillText('error!',10,425)
     }
+    if (Finesse.wrong_spot != ''){
+        ctx.fillStyle = 'rgb(235, 79, 101)';
+        ctx.fillText('Wrong',10,470)
+        ctx.fillText(Finesse.wrong_spot + '!',10,495)
+    }
 
     ctx.fillStyle = 'green';
     ctx.fillText('Errors:',420,450)
@@ -241,12 +252,16 @@ const finesse_moves = [
     {name: 'Soft Drop', move: g => g.softdrop()},
 ]
 
+function cells_key(cells){
+    return cells.map(cell => cell.join()).sort().join(' ')
+}
+
 // the cells a piece lands on if hard dropped now, and for T whether it counts as a T-spin
 function landing_key(g){
     var previous_y = g.y
     var previous_lastmove = g.lastmove
     g.drop()
-    var key = g.to_shape().map(cell => cell.join()).sort().join(' ')
+    var key = cells_key(g.to_shape())
     if (g.tetramino == 'T') key += ' ' + g.is_tspin()
     g.y = previous_y
     g.lastmove = previous_lastmove
@@ -357,15 +372,28 @@ function grey_out(cells, full_rows){
     }
 }
 
+// bring back the piece and hold from the start of the turn
+function redo_turn(){
+    game.bag = Finesse.turn.bag.slice()
+    game.holdmino = Finesse.turn.holdmino
+    game.update()
+    start_turn()
+}
+
 function hard_drop(){
+    // a redone piece can only be placed in the spot it had the finesse error in
+    if (Finesse.target != null && landing_key(game) != Finesse.target_key){
+        Finesse.wrong_spot = cells_key(landing_cells()) == cells_key(Finesse.target)? 'spin': 'spot'
+        redo_turn()
+        return
+    }
+    Finesse.wrong_spot = ''
     var fault = check_finesse()
     if (fault && Config.redo_ind){
         Finesse.target = landing_cells()
         Finesse.target_piece = game.tetramino
-        game.bag = Finesse.turn.bag.slice()
-        game.holdmino = Finesse.turn.holdmino
-        game.update()
-        start_turn()
+        Finesse.target_key = landing_key(game)
+        redo_turn()
         update_stats()
         return
     }
@@ -395,6 +423,7 @@ function hold(){
 function retry(){
     game = new Game()
     Finesse.target = null
+    Finesse.wrong_spot = ''
     start_turn()
     render()
 }
