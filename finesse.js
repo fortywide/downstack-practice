@@ -389,6 +389,7 @@ function hard_drop(){
     }
     Finesse.wrong_spot = ''
     var fault = check_finesse()
+    if (fault) sound.lose.cloneNode().play()
     if (fault && Config.redo_ind){
         Finesse.target = landing_cells()
         Finesse.target_piece = game.tetramino
@@ -410,7 +411,7 @@ function hard_drop(){
     if (game === current && fault && Config.grey_ind) grey_out(cells, full_rows)
     Finesse.target = null
     start_turn()
-    play_sound()
+    if (!fault) play_sound()
     update_stats()
 }
 
